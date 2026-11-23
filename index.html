@@ -61,7 +61,7 @@ th{color:var(--mut);font-weight:500;font-size:12px}
     <h1>Daily Profit &amp; Loss</h1>
     <div id="cloud-status" class="cloud-badge">☁️ Connecting to Supabase Cloud...</div>
   </div>
-  <div><button id="chpin">Change PIN</button><button id="lockbtn">Lock</button></div>
+  <div><button id="exportbtn">📥 Excel</button><button id="chpin">Change PIN</button><button id="lockbtn">Lock</button></div>
 </div>
 
 <div class="card">
@@ -295,6 +295,53 @@ $("chpin").onclick = function() {
   if (!/^\d{4,8}$/.test(n)) { alert("PIN must be 4–8 digits"); return; }
   setPin(n); alert("PIN changed");
 };
+
+function exportToExcel() {
+  if (!data || !data.length) {
+    alert("No trades recorded yet to export!");
+    return;
+  }
+  var sorted = data.slice().sort(function(a, b) { return a.date > b.date ? 1 : -1; });
+  var csvContent = "\uFEFF"; // UTF-8 BOM so Microsoft Excel cleanly renders formatting & numbers
+  csvContent += "Date,Invested (INR),Charges & Taxes (INR),Gross P/L (INR),Net Profit/Loss (INR),Final Balance (INR),Trade Status\n";
+  
+  var totChg = 0, totGross = 0, totNet = 0;
+  sorted.forEach(function(e) {
+    var net = e.pl - e.chg;
+    var tot = e.inv - e.chg + e.pl;
+    var status = e.pl > 0 ? "PROFIT" : (e.pl < 0 ? "LOSS" : "BREAKEVEN");
+    totChg += e.chg; totGross += e.pl; totNet += net;
+    var dParts = e.date.split("-");
+    var dFormatted = dParts[2] + "/" + dParts[1] + "/" + dParts[0];
+    csvContent += [
+      dFormatted,
+      e.inv.toFixed(2),
+      e.chg.toFixed(2),
+      e.pl.toFixed(2),
+      net.toFixed(2),
+      tot.toFixed(2),
+      status
+    ].join(",") + "\n";
+  });
+
+  csvContent += "\n";
+  csvContent += "--- INCOME TAX / AUDIT SUMMARY ---\n";
+  csvContent += "Total Trading Days," + sorted.length + "\n";
+  csvContent += "Total Statutory Charges & STT (INR)," + totChg.toFixed(2) + "\n";
+  csvContent += "Total Gross Profit/Loss (INR)," + totGross.toFixed(2) + "\n";
+  csvContent += "Total Net Taxable Realized P/L (INR)," + totNet.toFixed(2) + "\n";
+
+  var blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  var url = URL.createObjectURL(blob);
+  var link = document.createElement("a");
+  link.setAttribute("href", url);
+  link.setAttribute("download", "AuraAI_Trading_PnL_Tax_Report_" + today() + ".csv");
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+$("exportbtn").onclick = exportToExcel;
 
 showLock();
 resetForm();
